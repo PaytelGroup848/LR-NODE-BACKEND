@@ -22,6 +22,13 @@ const {
   getPartnerStats,
   getDashboard,
 } = require('../controllers/superadminController');
+const {
+  generateBill,
+  listBills,
+  getBill,
+  getBillPDF,
+  sendBillEmail,
+} = require('../controllers/billingController');
 
 router.use(requireAuth, requireRole(['SUPERADMIN']));
 
@@ -46,5 +53,12 @@ router.post('/partners/:id/keys/send-email', sendPartnerBulkEmail);
 router.patch('/partners/:id/suspend', suspendPartner);
 router.patch('/partners/:id/unsuspend', unsuspendPartner);
 router.get('/partners/:id/stats', getPartnerStats);
+
+// Billing Routes
+router.post('/billing/generate', generateBill);
+router.get('/billing', listBills);
+router.get('/billing/:id', getBill);
+router.get('/billing/:id/pdf', getBillPDF);
+router.post('/billing/:id/send-email', sendBillEmail);
 
 module.exports = router;

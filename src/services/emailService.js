@@ -1,4 +1,4 @@
-const sendEmail = async (to, subject, htmlContent) => {
+const sendEmail = async (to, subject, htmlContent, attachments = []) => {
   const apiKey = process.env.BREVO_API_KEY;
   const senderEmail = process.env.BREVO_SENDER_EMAIL;
   const senderName = process.env.BREVO_SENDER_NAME;
@@ -9,6 +9,17 @@ const sendEmail = async (to, subject, htmlContent) => {
   }
 
   try {
+    const body = {
+      sender: { name: senderName, email: senderEmail },
+      to: [{ email: to }],
+      subject,
+      htmlContent,
+    };
+
+    if (attachments.length > 0) {
+      body.attachment = attachments;
+    }
+
     const response = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
       headers: {
@@ -16,12 +27,7 @@ const sendEmail = async (to, subject, htmlContent) => {
         'api-key': apiKey,
         'content-type': 'application/json',
       },
-      body: JSON.stringify({
-        sender: { name: senderName, email: senderEmail },
-        to: [{ email: to }],
-        subject,
-        htmlContent,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -31,6 +37,88 @@ const sendEmail = async (to, subject, htmlContent) => {
   } catch (err) {
     console.error('Error sending email:', err);
   }
+};
+
+const sendInvoiceEmail = async (to, bill, pdfBuffer) => {
+  const subject = `Invoice ${bill.billNumber} - LR License Keys`;
+  
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          line-height: 1.6;
+          color: #333;
+        }
+        .email-container {
+          max-width: 600px;
+          margin: 0 auto;
+          padding: 20px;
+        }
+        .header {
+          background: linear-gradient(135deg, #007bff, #0056b3);
+          color: white;
+          padding: 20px;
+          border-radius: 8px 8px 0 0;
+        }
+        .content {
+          padding: 20px;
+          background: #f9f9f9;
+          border-radius: 0 0 8px 8px;
+        }
+        .invoice-details {
+          background: white;
+          padding: 20px;
+          border-radius: 8px;
+          margin: 20px 0;
+        }
+        .footer {
+          margin-top: 20px;
+          font-size: 12px;
+          color: #666;
+          text-align: center;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="email-container">
+        <div class="header">
+          <h1>LR License Management</h1>
+        </div>
+        <div class="content">
+          <p>Hello,</p>
+          <p>Please find attached your invoice for LR License Keys.</p>
+          
+          <div class="invoice-details">
+            <h3>Invoice Details</h3>
+            <p><strong>Invoice Number:</strong> ${bill.billNumber}</p>
+            <p><strong>Purchased Date:</strong> ${new Date(bill.purchasedDate).toLocaleDateString('en-IN')}</p>
+            <p><strong>Renewal Date:</strong> ${new Date(bill.renewalDate).toLocaleDateString('en-IN')}</p>
+            <p><strong>Key Quantity:</strong> ${bill.keyQuantity}</p>
+            <p><strong>Total Amount:</strong> ₹${bill.totalAmount.toFixed(2)}</p>
+          </div>
+          
+          <p>Thank you for your business!</p>
+          
+          <div class="footer">
+            <p>This is an automated email, please do not reply.</p>
+          </div>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  const attachments = [
+    {
+      content: pdfBuffer.toString('base64'),
+      name: `Invoice_${bill.billNumber}.pdf`,
+    },
+  ];
+
+  await sendEmail(to, subject, htmlContent, attachments);
 };
 
 const sendSingleKeyEmail = async (user, licenseKey) => {
@@ -66,4 +154,5 @@ const sendBulkKeysEmail = async (partner, keys) => {
 module.exports = {
   sendSingleKeyEmail,
   sendBulkKeysEmail,
+  sendInvoiceEmail,
 };
