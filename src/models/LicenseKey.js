@@ -18,6 +18,7 @@ const licenseKeySchema = new mongoose.Schema(
       required: true,
     },
     assignedToClient: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
+    partnerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true }, // Partner that this partner_pool key belongs to
     generatedFor: {
       type: String,
       enum: ['superadmin_client', 'partner_bulk'],

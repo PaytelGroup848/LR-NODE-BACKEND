@@ -83,6 +83,7 @@ const generateBill = async (req, res, next) => {
         status: entityType === 'client' ? 'active' : 'unassigned',
         ownerType: entityType === 'client' ? 'client' : 'partner_pool',
         assignedToClient: entityType === 'client' ? entityId : null,
+        partnerId: entityType === 'partner' ? entityId : null,
         generatedFor: entityType === 'client' ? 'superadmin_client' : 'partner_bulk',
         createdBy: req.user._id,
         batchId,

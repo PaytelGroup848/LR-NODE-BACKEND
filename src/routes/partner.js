@@ -19,7 +19,7 @@ router.get('/dashboard', getDashboard);
 router.post('/clients', createClient);
 router.get('/clients', listClients);
 router.get('/keys', listKeys);
-router.post('/keys/:keyId/assign', assignKey);
+router.patch('/keys/:keyId/assign', assignKey);
 router.patch('/keys/:keyId/suspend', suspendKey);
 router.patch('/keys/:keyId/unsuspend', unsuspendKey);
 router.post('/keys/:keyId/send-email', sendKeyEmail);

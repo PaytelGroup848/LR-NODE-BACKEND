@@ -24,7 +24,7 @@ const generateUniqueKey = async () => {
   return key;
 };
 
-const generateBulkKeys = async (quantity, validityDays, generatedFor, createdBy, ownerType, assignedToClient = null) => {
+const generateBulkKeys = async (quantity, validityDays, generatedFor, createdBy, ownerType, assignedToClient = null, partnerId = null) => {
   const batchId = uuidv4();
   const keys = [];
   const issuedAt = new Date();
@@ -41,6 +41,7 @@ const generateBulkKeys = async (quantity, validityDays, generatedFor, createdBy,
       status: ownerType === 'client' ? 'active' : 'unassigned',
       ownerType,
       assignedToClient,
+      partnerId,
       generatedFor,
       createdBy,
       batchId,

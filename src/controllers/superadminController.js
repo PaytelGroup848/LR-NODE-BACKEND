@@ -251,7 +251,9 @@ const generatePartnerBulkKeys = async (req, res, next) => {
       validityDays,
       'partner_bulk',
       req.user._id,
-      'partner_pool'
+      'partner_pool',
+      null,
+      partner._id // pass partnerId as 7th arg!
     );
     res.status(201).json(successResponse({ keys, batchId }));
   } catch (err) {

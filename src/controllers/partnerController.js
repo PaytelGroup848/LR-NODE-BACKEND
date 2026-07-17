@@ -58,7 +58,7 @@ const listClients = async (req, res, next) => {
 const listKeys = async (req, res, next) => {
   try {
     const { page, limit, skip, search, status, sortBy, sortOrder } = getPagination(req.query);
-    const filter = { ownerType: 'partner_pool', createdBy: req.user._id };
+    const filter = { ownerType: 'partner_pool', partnerId: req.user._id }; // changed createdBy to partnerId
     if (status) filter.status = status;
     if (search) {
       filter.key = { $regex: search, $options: 'i' };
@@ -77,7 +77,7 @@ const assignKey = async (req, res, next) => {
   try {
     const { clientId } = req.body;
     const key = await LicenseKey.findById(req.params.keyId);
-    if (!key || key.ownerType !== 'partner_pool' || key.createdBy.toString() !== req.user._id.toString()) {
+    if (!key || key.ownerType !== 'partner_pool' || key.partnerId.toString() !== req.user._id.toString()) { // changed createdBy to partnerId
       return res.status(404).json(errorResponse('Key not found'));
     }
     const client = await User.findById(clientId);
@@ -96,7 +96,7 @@ const assignKey = async (req, res, next) => {
 const suspendKey = async (req, res, next) => {
   try {
     const key = await LicenseKey.findById(req.params.keyId);
-    if (!key || key.ownerType !== 'partner_pool' || key.createdBy.toString() !== req.user._id.toString()) {
+    if (!key || key.ownerType !== 'partner_pool' || key.partnerId.toString() !== req.user._id.toString()) { // changed createdBy to partnerId
       return res.status(404).json(errorResponse('Key not found'));
     }
     key.status = 'suspended';
@@ -110,7 +110,7 @@ const suspendKey = async (req, res, next) => {
 const unsuspendKey = async (req, res, next) => {
   try {
     const key = await LicenseKey.findById(req.params.keyId);
-    if (!key || key.ownerType !== 'partner_pool' || key.createdBy.toString() !== req.user._id.toString()) {
+    if (!key || key.ownerType !== 'partner_pool' || key.partnerId.toString() !== req.user._id.toString()) { // changed createdBy to partnerId
       return res.status(404).json(errorResponse('Key not found'));
     }
     if (key.status === 'expired') {
@@ -127,7 +127,7 @@ const unsuspendKey = async (req, res, next) => {
 const sendKeyEmail = async (req, res, next) => {
   try {
     const key = await LicenseKey.findById(req.params.keyId).populate('assignedToClient');
-    if (!key || key.ownerType !== 'partner_pool' || key.createdBy.toString() !== req.user._id.toString()) {
+    if (!key || key.ownerType !== 'partner_pool' || key.partnerId.toString() !== req.user._id.toString()) { // changed createdBy to partnerId
       return res.status(404).json(errorResponse('Key not found'));
     }
     if (!key.assignedToClient) {
@@ -148,7 +148,7 @@ const getDashboard = async (req, res, next) => {
     const [clientCount, keyStats] = await Promise.all([
       User.countDocuments({ role: 'PARTNER_CLIENT', createdBy: req.user._id }),
       LicenseKey.aggregate([
-        { $match: { ownerType: 'partner_pool', createdBy: req.user._id } },
+        { $match: { ownerType: 'partner_pool', partnerId: req.user._id } }, // changed createdBy to partnerId
         {
           $group: {
             _id: null,
@@ -164,7 +164,7 @@ const getDashboard = async (req, res, next) => {
     next7Days.setDate(next7Days.getDate() + 7);
     const expiringSoon = await LicenseKey.countDocuments({
       ownerType: 'partner_pool',
-      createdBy: req.user._id,
+      partnerId: req.user._id, // changed createdBy to partnerId
       expiresAt: { $gte: now, $lte: next7Days },
       status: { $in: ['active', 'unassigned'] },
     });
