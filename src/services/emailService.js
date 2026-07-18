@@ -1,3 +1,4 @@
+//this is the code where u have to make changes
 const sendEmail = async (to, subject, htmlContent, attachments = []) => {
   const apiKey = process.env.BREVO_API_KEY;
   const senderEmail = process.env.BREVO_SENDER_EMAIL;

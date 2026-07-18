@@ -1,287 +1,689 @@
-const puppeteer = require('puppeteer');
-const numberToWords = require('number-to-words');
-const invoiceCompanyInfo = require('../config/invoiceCompanyInfo');
-const path = require('path');
-const fs = require('fs');
+const puppeteer = require("puppeteer");
+const fs = require("fs");
+const path = require("path");
+const invoiceCompanyInfo = require("../config/invoiceCompanyInfo");
+const os = require("os");
 
-const formatINR = (number) => {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-  }).format(number);
-};
+const GST_RATE_DEFAULT = 18;
 
-const numberToWordsINR = (number) => {
-  const rupees = Math.floor(number);
-  const paise = Math.round((number - rupees) * 100);
-  let words = '';
-  if (rupees > 0) {
-    words += numberToWords.toWords(rupees) + ' Rupees';
-  }
-  if (paise > 0) {
-    words += ' and ' + numberToWords.toWords(paise) + ' Paise';
-  }
-  return words.charAt(0).toUpperCase() + words.slice(1);
-};
-
-const generateInvoiceHTML = (bill, entity, keys) => {
-  const purchasedDate = new Date(bill.purchasedDate).toLocaleDateString('en-IN');
-  const renewalDate = new Date(bill.renewalDate).toLocaleDateString('en-IN');
-  
-  // Try to read logo, fallback to text if not found
-  let logoBase64 = '';
+const getLogoBase64 = () => {
   try {
-    const logoPath = path.join(__dirname, '../../', invoiceCompanyInfo.logoPath);
+    const logoPath = path.join(
+      __dirname,
+      "../../",
+      invoiceCompanyInfo.logoPath,
+    );
     if (fs.existsSync(logoPath)) {
       const logoBuffer = fs.readFileSync(logoPath);
-      logoBase64 = `data:image/svg+xml;base64,${logoBuffer.toString('base64')}`;
+      const base64Logo = logoBuffer.toString("base64");
+      return `data:image/svg+xml;base64,${base64Logo}`;
     }
-  } catch (err) {
-    console.warn('Logo not found, falling back to text');
+    console.warn("Logo file not found at:", logoPath);
+    return invoiceCompanyInfo.logoFallbackUrl;
+  } catch (error) {
+    console.error("Error reading logo:", error);
+    return invoiceCompanyInfo.logoFallbackUrl;
   }
-
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <style>
-        * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
-          font-family: 'Arial', sans-serif;
-        }
-        body {
-          padding: 20px;
-          background: #f5f5f5;
-        }
-        .invoice-container {
-          width: 100%;
-          max-width: 800px;
-          margin: 0 auto;
-          background: white;
-          padding: 30px;
-          position: relative;
-        }
-        .watermark {
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%) rotate(-30deg);
-          opacity: 0.1;
-          font-size: 120px;
-          font-weight: bold;
-          color: #007bff;
-          z-index: 0;
-        }
-        .header {
-          display: flex;
-          justify-content: space-between;
-          margin-bottom: 30px;
-          position: relative;
-          z-index: 1;
-        }
-        .company-info {
-          text-align: left;
-        }
-        .company-logo {
-          max-height: 60px;
-        }
-        .invoice-meta {
-          text-align: right;
-        }
-        .invoice-number {
-          font-size: 18px;
-          font-weight: bold;
-          color: #007bff;
-        }
-        .bill-to {
-          margin-bottom: 20px;
-          border: 1px solid #ddd;
-          padding: 15px;
-        }
-        .section-title {
-          font-weight: bold;
-          margin-bottom: 10px;
-          color: #333;
-        }
-        table {
-          width: 100%;
-          border-collapse: collapse;
-          margin-bottom: 20px;
-        }
-        th, td {
-          border: 1px solid #ddd;
-          padding: 8px;
-          text-align: left;
-        }
-        th {
-          background-color: #f0f0f0;
-        }
-        .gst-table th, .gst-table td {
-          padding: 5px;
-        }
-        .amount-in-words {
-          margin-top: 10px;
-          font-style: italic;
-        }
-        .bank-details {
-          margin-top: 20px;
-          border: 1px solid #ddd;
-          padding: 15px;
-        }
-        .terms {
-          margin-top: 20px;
-          font-size: 12px;
-        }
-        .page-break {
-          page-break-after: always;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="invoice-container">
-        <div class="watermark">LR SOLUTIONS</div>
-        
-        <!-- Page 1 -->
-        <div class="header">
-          <div class="company-info">
-            ${logoBase64 ? `<img src="${logoBase64}" alt="Logo" class="company-logo" />` : `<h2>${invoiceCompanyInfo.name}</h2>`}
-            <p>${invoiceCompanyInfo.address}</p>
-            <p>${invoiceCompanyInfo.city}, ${invoiceCompanyInfo.state} - ${invoiceCompanyInfo.pincode}</p>
-            <p>GSTIN: ${invoiceCompanyInfo.gstin}</p>
-            <p>Phone: ${invoiceCompanyInfo.phone} | Email: ${invoiceCompanyInfo.email}</p>
-          </div>
-          <div class="invoice-meta">
-            <div class="invoice-number">Invoice #: ${bill.billNumber}</div>
-            <p>Purchased Date: ${purchasedDate}</p>
-            <p>Renewal Date: ${renewalDate}</p>
-          </div>
-        </div>
-
-        <div class="bill-to">
-          <div class="section-title">Bill To:</div>
-          <p><strong>${entity.representativeName}</strong></p>
-          <p>${entity.companyName || ''}</p>
-          <p>${entity.address || ''}</p>
-          <p>Email: ${entity.email}</p>
-          <p>GSTIN: ${entity.gstNumber || 'N/A'}</p>
-        </div>
-
-        <div class="section-title">License Keys:</div>
-        <table>
-          <thead>
-            <tr>
-              <th>Sl. No.</th>
-              <th>License Key</th>
-              <th>Assigned To</th>
-              <th>Valid From</th>
-              <th>Valid Until</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${keys.map((key, index) => `
-              <tr>
-                <td>${index + 1}</td>
-                <td><strong>${key.key}</strong></td>
-                <td>${bill.username}</td>
-                <td>${new Date(key.issuedAt).toLocaleDateString('en-IN')}</td>
-                <td>${new Date(key.expiresAt).toLocaleDateString('en-IN')}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-
-        <table class="gst-table">
-          <thead>
-            <tr>
-              <th>Description</th>
-              <th>Amount (INR)</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>Total Amount without GST</td>
-              <td>${formatINR(bill.amountWithoutGST)}</td>
-            </tr>
-            <tr>
-              <td>CGST @ ${bill.gstRate / 2}%</td>
-              <td>${formatINR(bill.gstAmount / 2)}</td>
-            </tr>
-            <tr>
-              <td>SGST @ ${bill.gstRate / 2}%</td>
-              <td>${formatINR(bill.gstAmount / 2)}</td>
-            </tr>
-            <tr style="font-weight: bold;">
-              <td>Total Amount</td>
-              <td>${formatINR(bill.totalAmount)}</td>
-            </tr>
-          </tbody>
-        </table>
-
-        <div class="amount-in-words">
-          <strong>Amount in Words:</strong> ${numberToWordsINR(bill.totalAmount)} Only
-        </div>
-
-        <div class="bank-details">
-          <div class="section-title">Bank Details:</div>
-          <p><strong>Account Holder:</strong> ${invoiceCompanyInfo.bankDetails.accountHolder}</p>
-          <p><strong>Bank Name:</strong> ${invoiceCompanyInfo.bankDetails.bankName}</p>
-          <p><strong>Branch:</strong> ${invoiceCompanyInfo.bankDetails.branch}</p>
-          <p><strong>Account Number:</strong> ${invoiceCompanyInfo.bankDetails.accountNumber}</p>
-          <p><strong>IFSC Code:</strong> ${invoiceCompanyInfo.bankDetails.ifscCode}</p>
-        </div>
-
-        <div class="terms">
-          <div class="section-title">Terms & Conditions:</div>
-          <ol>
-            <li>All keys are valid from purchased date to renewal date.</li>
-            <li>Keys are non-refundable and non-transferable.</li>
-            <li>Please check the keys at the time of receipt.</li>
-            <li>For any queries, contact support at ${invoiceCompanyInfo.email}.</li>
-          </ol>
-        </div>
-
-        <!-- Page 2 - Terms (placeholder for detailed terms) -->
-        <div class="page-break"></div>
-        <div class="invoice-container" style="padding-top: 50px;">
-          <h3>Detailed Terms & Conditions</h3>
-          <!-- TODO: Update these terms as per actual company policy -->
-          <p><strong>1. License Key Usage</strong></p>
-          <p>Each license key is unique and can be used for a single instance of the LR software product.</p>
-          
-          <p><strong>2. Validity Period</strong></p>
-          <p>License keys are valid for the period specified in this invoice. Renewal is required after expiry.</p>
-          
-          <p><strong>3. Support</strong></p>
-          <p>Technical support is provided during the validity period of the license keys.</p>
-          
-          <p><strong>4. Jurisdiction</strong></p>
-          <p>All disputes subject to ${invoiceCompanyInfo.jurisdiction} jurisdiction only.</p>
-        </div>
-      </div>
-    </body>
-    </html>
-  `;
 };
 
+// ---------- Number to Words (Indian system) ----------
+const numberToWords = (num) => {
+  if (num === 0) return "Zero";
+  const ones = [
+    "",
+    "One",
+    "Two",
+    "Three",
+    "Four",
+    "Five",
+    "Six",
+    "Seven",
+    "Eight",
+    "Nine",
+    "Ten",
+    "Eleven",
+    "Twelve",
+    "Thirteen",
+    "Fourteen",
+    "Fifteen",
+    "Sixteen",
+    "Seventeen",
+    "Eighteen",
+    "Nineteen",
+  ];
+  const tens = [
+    "",
+    "",
+    "Twenty",
+    "Thirty",
+    "Forty",
+    "Fifty",
+    "Sixty",
+    "Seventy",
+    "Eighty",
+    "Ninety",
+  ];
+  if (num < 20) return ones[num];
+  if (num < 100)
+    return tens[Math.floor(num / 10)] + (num % 10 ? " " + ones[num % 10] : "");
+  if (num < 1000)
+    return (
+      ones[Math.floor(num / 100)] +
+      " Hundred" +
+      (num % 100 ? " and " + numberToWords(num % 100) : "")
+    );
+  if (num < 100000)
+    return (
+      numberToWords(Math.floor(num / 1000)) +
+      " Thousand" +
+      (num % 1000 ? " " + numberToWords(num % 1000) : "")
+    );
+  if (num < 10000000)
+    return (
+      numberToWords(Math.floor(num / 100000)) +
+      " Lakh" +
+      (num % 100000 ? " " + numberToWords(num % 100000) : "")
+    );
+  return (
+    numberToWords(Math.floor(num / 10000000)) +
+    " Crore" +
+    (num % 10000000 ? " " + numberToWords(num % 10000000) : "")
+  );
+};
+
+const amountInWords = (amount) => {
+  const rupees = Math.floor(amount);
+  const paise = Math.round((amount - rupees) * 100);
+  let words = numberToWords(rupees) + " Rupees";
+  if (paise > 0) words += " and " + numberToWords(paise) + " Paise";
+  words += " Only";
+  return words;
+};
+
+const formatINR = (amount) =>
+  new Intl.NumberFormat("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+
+// ---------- Terms & Conditions (same as Sales-Billing) ----------
+const termsAndConditionsPage1 = [
+  {
+    title: "Scope of Services",
+    points: [
+      "Cloudedata shall provide secure, cloud-hosted access to its Accounting ERP solution, including storage and management of the Client's accounting data on its dedicated servers.",
+    ],
+  },
+];
+
+const termsAndConditions = [
+  {
+    title: "Data Responsibility & Security",
+    points: [
+      "Cloudedata takes full responsibility for uptime, access, and safeguarding of the Client's ERP data. In the event of a cyber-attack or malicious intrusion, Cloudedata shall restore the most recent verified backup to resume operations. Cloudedata shall not be liable beyond the point of the last backup.",
+    ],
+  },
+  {
+    title: "Client Conduct & Liability",
+    points: [
+      "The Client agrees to maintain responsible, lawful, and respectful usage of the provided services. The Client shall be solely liable for any misconduct, abuse, or inappropriate behavior—whether verbal, written, or digital—by themselves or their authorized users toward Cloudedata's personnel or systems. Cloudedata reserves the right to suspend or terminate services in such cases.",
+    ],
+  },
+  {
+    title: "Data Access & Client Control",
+    points: [
+      "Cloudedata shall have no right to access, view, or alter any of the Client's data stored on the cloud platform or within the designated folders assigned to the Client. The Client shall have full and independent control over their data, including the ability to copy, paste, and delete any files or folders within their allocated space. Cloudedata does not interfere with or modify client data under any circumstances. Accordingly, the entire responsibility for managing the data, including copying, pasting, editing, or deletion, lies solely with the Client or members of the Client",
+    ],
+  },
+  {
+    title: "Malicious File Policy",
+    points: [
+      "Uploading or executing any malicious, harmful, or unauthorized files is strictly prohibited. If such actions result in data loss, damage, or service interruption, the Client shall be fully liable for the total loss, and Cloudedata may recover the full cost of the damage.",
+    ],
+  },
+  {
+    title: "Backup Policy",
+    points: [
+      "Data is backed up at regular intervals (e.g., daily). In the event of data loss, the latest backup will be restored within 6–24 hours.",
+    ],
+  },
+  {
+    title: "Server Maintenance & Downtime",
+    points: [
+      "Cloudedata reserves the right to initiate emergency server maintenance at any time in case of a critical issue. The Client will be given at least one (1) hour's prior notice.",
+    ],
+  },
+  {
+    title: "Support Availability",
+    points: [
+      "Support is available only during working hours (Monday to Saturday, 10:00 AM – 7:30 PM IST). No after-hours, weekend, or holiday support is provided. All support will be provided strictly on a ticket basis. Tickets will be generated via our official support portal or by sending an email to the designated support email address.",
+    ],
+  },
+  {
+    title: "No Refund Policy",
+    points: [
+      "All fees paid to Cloudedata are non-refundable under any circumstances, including but not limited to cancellation, discontinuation, dissatisfaction, or downtime caused by third-party or client-side issues.",
+    ],
+  },
+  {
+    title: "Fees & Payment",
+    points: [
+      "The Client agrees to pay the billing amount as mentioned in the invoice according to the selected Plan and Billing Period.",
+    ],
+  },
+  {
+    title: "Term, Renewal & Termination",
+    points: [
+      "This Agreement shall be automatically renewed with each service renewal unless either party provides 30 days' written notice. Upon termination, data will be made available for export for 2–3 days.",
+    ],
+  },
+  {
+    title: "Governing Law & Jurisdiction",
+    points: [
+      "This Agreement shall be governed by the laws of India, and any disputes shall fall under the exclusive jurisdiction of the courts at New Delhi.",
+      "By digitally signing this Agreement, the Client confirms having read, understood, and agreed to all the terms and conditions above.",
+    ],
+  },
+];
+
+// ---------- Generate HTML ----------
+const generateHTML = (bill, entity, keys) => {
+  const logoUrl = getLogoBase64();
+  const companyInfo = invoiceCompanyInfo;
+
+  const baseAmount = parseFloat(bill.amountWithoutGST) || 0;
+  const gstRate = bill.gstRate || GST_RATE_DEFAULT;
+  const gstAmount =
+    bill.gstAmount != null
+      ? parseFloat(bill.gstAmount)
+      : parseFloat(((baseAmount * gstRate) / 100).toFixed(2));
+  const totalAmount =
+    bill.totalAmount != null
+      ? parseFloat(bill.totalAmount)
+      : parseFloat((baseAmount + gstAmount).toFixed(2));
+
+  const hsnCode = companyInfo.hsnCode;
+  const purchasedDateStr = new Date(bill.purchasedDate).toLocaleDateString(
+    "en-IN",
+    { day: "2-digit", month: "short", year: "numeric" },
+  );
+  const renewalDateStr = new Date(bill.renewalDate).toLocaleDateString(
+    "en-IN",
+    { day: "2-digit", month: "short", year: "numeric" },
+  );
+
+  // Sub-rows: one per generated key
+  const keyRowsHTML = keys
+    .map(
+      (k) => `
+      <tr>
+        <td style="border-left:1px solid #aaa;border-right:1px solid #aaa;padding:3px 6px;"></td>
+        <td style="border-right:1px solid #aaa;padding:3px 6px 3px 18px;font-size:10.5px;color:#333;">
+          ${k.key} &nbsp;(${new Date(k.issuedAt).toLocaleDateString("en-IN")} – ${new Date(k.expiresAt).toLocaleDateString("en-IN")})
+        </td>
+        <td style="border-right:1px solid #aaa;"></td>
+        <td style="border-right:1px solid #aaa;"></td>
+        <td style="border-right:1px solid #aaa;"></td>
+        <td style="border-right:1px solid #aaa;"></td>
+        <td style="border-right:1px solid #aaa;"></td>
+      </tr>`,
+    )
+    .join("");
+
+  const Page1termsHTML = termsAndConditionsPage1
+    .map(
+      (section) => `
+      <div style="margin-bottom:10px;">
+        <div style="font-size:11px;font-weight:700;color:#1e293b;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.3px;">${section.title}</div>
+        <ul style="margin:0;padding-left:18px;">
+          ${section.points.map((p) => `<li style="font-size:10.5px;color:#334155;line-height:1.6;margin-bottom:3px;">${p}</li>`).join("")}
+        </ul>
+      </div>`,
+    )
+    .join("");
+
+  const termsHTML = termsAndConditions
+    .map(
+      (section) => `
+      <div style="margin-bottom:10px;">
+        <div style="font-size:11px;font-weight:700;color:#1e293b;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.3px;">${section.title}</div>
+        <ul style="margin:0;padding-left:18px;">
+          ${section.points.map((p) => `<li style="font-size:10.5px;color:#334155;line-height:1.6;margin-bottom:3px;">${p}</li>`).join("")}
+        </ul>
+      </div>`,
+    )
+    .join("");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Invoice ${bill.billNumber}</title>
+  <style>
+    @page { size: A4; margin: 0; }
+    * { margin:0; padding:0; box-sizing:border-box; font-family: Arial, sans-serif; }
+    body { background:#fff; color:#1e293b; }
+
+    .page {
+      width: 210mm;
+      min-height: 297mm;
+      padding: 5mm 14mm 0mm 14mm;
+      position: relative;
+      page-break-after: always;
+      overflow: hidden;
+    }
+    .page:last-child { page-break-after: avoid; }
+
+    .invoice-header {
+      position: relative;
+      padding-bottom: 6px;
+      margin-bottom: 5px;
+      min-height: 30px;
+    }
+
+    .page::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-20deg);
+      width: 120mm;
+      height: 120mm;
+      background: url("${logoUrl}") no-repeat center;
+      background-size: contain;
+      opacity: 0.2;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .page > * { position: relative; z-index: 1; }
+
+    .company-logo {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 92px;
+      height: auto;
+    }
+
+    .invoice-title {
+      text-align: center;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #1e293b;
+      line-height: 42px;
+    }
+
+    .top-grid {
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:0;
+      border:1px solid #ccc;
+      margin-bottom:0;
+    }
+    .top-grid .cell { padding:8px 10px; font-size:10.5px; line-height:1.55; }
+    .top-grid .cell.border-right { border-right:1px solid #ccc; }
+    .top-grid .cell.border-bottom { border-bottom:1px solid #ccc; }
+    .company-name-top { font-size:13px; font-weight:700; color:#1e293b; margin-bottom:3px; }
+    .label-sm { font-size:9.5px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.3px; }
+    .value-md { font-size:11.5px; font-weight:700; color:#1e293b; }
+
+    .bill-to-section {
+      border:1px solid #ccc;
+      border-top:none;
+      padding:4px 6px;
+      font-size:10.5px;
+      line-height:1.4;
+    }
+    .section-head { font-size:10px; font-weight:700; text-transform:uppercase; color:#64748b; letter-spacing:0.4px; margin-bottom:4px; }
+    .buyer-name { font-size:13px; font-weight:700; color:#1e293b; }
+
+    .amount-box { border:1px solid #ccc; border-top:none; }
+    .amount-row { display:flex; justify-content:space-between; align-items:center; padding:6px 10px; font-size:11px; border-bottom:1px solid #f1f5f9; }
+    .amount-row:last-child { border-bottom:none; }
+    .amount-row.total-row { background:#EBEBEB; color:#000000; font-weight:700; font-size:12px; }
+
+    .tax-table { width:100%; border-collapse:collapse; margin-top:8px; font-size:10.5px; }
+    .tax-table th { border:1px solid #ccc; padding:6px 10px; background:#f1f5f9; font-size:9.5px; font-weight:700; text-transform:uppercase; color:#475569; text-align:center; }
+    .tax-table td { border:1px solid #ccc; padding:6px 10px; text-align:center; color:#1e293b; }
+
+    .page1-footer {
+      position: absolute;
+      left: 14mm;
+      right: 14mm;
+      bottom: 10mm;
+      padding-top: 8px;
+      border-top: 1px solid #e2e8f0;
+      font-size: 9.5px;
+      color: #94a3b8;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    .terms-page {
+      width:210mm;
+      height:297mm;
+      padding:14mm 14mm 14mm 14mm;
+      position: relative;
+      overflow: hidden;
+      page-break-after: avoid;
+      box-sizing: border-box;
+    }
+    .terms-title {
+      font-size:12px; font-weight:700; color:#1e293b; text-transform:uppercase;
+      letter-spacing:0.5px; margin-bottom:2px; padding-bottom:4px; margin-top:7px;
+      border-bottom:1px solid #D5D5D5;
+    }
+    .terms-subtitle { font-size:10px; color:#64748b; margin-bottom:8px; }
+
+    .terms-page::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-20deg);
+      width: 120mm;
+      height: 120mm;
+      background: url("${logoUrl}") no-repeat center;
+      background-size: contain;
+      opacity: 0.2;
+      z-index: 0;
+      pointer-events: none;
+    }
+    .terms-page > * { position: relative; z-index: 1; }
+
+    .terms-footer {
+      position: absolute;
+      left: 14mm;
+      right: 14mm;
+      bottom: 4mm;
+      padding-top: 10px;
+      border-top: 1px solid #e2e8f0;
+      font-size: 9.5px;
+      color: #64748b;
+      text-align: center;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ==================== PAGE 1: INVOICE ==================== -->
+<div class="page">
+
+  <div class="invoice-header">
+    <img class="company-logo" src="${logoUrl}" alt="Company Logo" />
+    <div class="invoice-title">Tax Invoice</div>
+  </div>
+
+  <div class="top-grid">
+    <div class="cell border-right border-bottom">
+      <div class="company-name-top">${companyInfo.companyName}</div>
+      <div>${companyInfo.addressLine1}, ${companyInfo.addressLine2}</div>
+      <div>${companyInfo.cityPincode}</div>
+      <div>GSTIN: <strong>${companyInfo.gstin}</strong></div>
+      <div>State: ${companyInfo.stateName} | Code: ${companyInfo.stateCode}</div>
+      <div>CIN: ${companyInfo.cin}</div>
+      <div>Email: ${companyInfo.email}</div>
+      <div>Website: ${companyInfo.website}</div>
+    </div>
+    <div class="cell border-bottom">
+      <div style="margin-bottom:6px;">
+        <div class="label-sm">Invoice No.</div>
+        <div class="value-md">${bill.billNumber}</div>
+      </div>
+      <div style="margin-bottom:6px;">
+        <div class="label-sm">Purchased Date</div>
+        <div class="value-md">${purchasedDateStr}</div>
+      </div>
+      <div style="margin-bottom:6px;">
+        <div class="label-sm">Renewal Date</div>
+        <div class="value-md">${renewalDateStr}</div>
+      </div>
+      <div>
+        <div class="label-sm">Service</div>
+        <div class="value-md">LR License Key Management</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bill-to-section">
+    <div class="section-head">Bill To</div>
+    <div class="buyer-name">${entity.companyName || entity.representativeName}</div>
+    <div>Representative: <strong>${entity.representativeName}</strong></div>
+    ${entity.phone ? `<div>Phone: ${entity.phone}</div>` : ""}
+    ${entity.email ? `<div>Email: ${entity.email}</div>` : ""}
+    ${entity.gstNumber ? `<div>GSTIN: <strong>${entity.gstNumber}</strong></div>` : ""}
+    ${entity.address ? `<div>Address: ${entity.address}</div>` : ""}
+    ${bill.username ? `<div>License User: <strong>${bill.username}</strong></div>` : ""}
+  </div>
+
+  <table style="width:100%;border-collapse:collapse;margin-top:8px;font-size:11px;">
+    <thead>
+      <tr style="background:#F1F5F9;">
+        <th style="border:1px solid #aaa;padding:5px 6px;text-align:center;width:5%;font-size:10px;">Sl<br>No.</th>
+        <th style="border:1px solid #aaa;padding:5px 6px;text-align:center;width:36%;font-size:10px;">Description of<br>Services</th>
+        <th style="border:1px solid #aaa;padding:5px 6px;text-align:center;width:7%;font-size:10px;">GST<br>Rate</th>
+        <th style="border:1px solid #aaa;padding:5px 6px;text-align:center;width:10%;font-size:10px;">Quantity</th>
+        <th style="border:1px solid #aaa;padding:5px 6px;text-align:right;width:12%;font-size:10px;">Rate</th>
+        <th style="border:1px solid #aaa;padding:5px 6px;text-align:center;width:6%;font-size:10px;">per</th>
+        <th style="border:1px solid #aaa;padding:5px 6px;text-align:right;width:14%;font-size:10px;">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="border-left:1px solid #aaa;border-right:1px solid #aaa;padding:5px 6px;text-align:center;font-size:11px;">1</td>
+        <td style="border-right:1px solid #aaa;padding:5px 6px;">
+          <div style="font-weight:700;font-size:11px;">LR License Keys</div>
+          <div style="font-size:10px;color:#555;">From ${purchasedDateStr} to ${renewalDateStr}</div>
+        </td>
+        <td style="border-right:1px solid #aaa;padding:5px 6px;text-align:center;font-size:11px;">${gstRate}%</td>
+        <td style="border-right:1px solid #aaa;padding:5px 6px;text-align:center;font-size:11px;">${bill.keyQuantity} No.</td>
+        <td style="border-right:1px solid #aaa;padding:5px 6px;text-align:right;font-size:11px;">${formatINR(baseAmount)}</td>
+        <td style="border-right:1px solid #aaa;padding:5px 6px;text-align:center;font-size:11px;">No.</td>
+        <td style="border-right:1px solid #aaa;padding:5px 6px;text-align:right;font-weight:700;font-size:11px;">${formatINR(baseAmount)}</td>
+      </tr>
+
+      ${keyRowsHTML}
+
+      ${Array(Math.max(0, 6 - keys.length))
+        .fill(
+          `
+        <tr style="height:18px;">
+          <td style="border-left:1px solid #aaa;border-right:1px solid #aaa;"></td>
+          <td style="border-right:1px solid #aaa;"></td>
+          <td style="border-right:1px solid #aaa;"></td>
+          <td style="border-right:1px solid #aaa;"></td>
+          <td style="border-right:1px solid #aaa;"></td>
+          <td style="border-right:1px solid #aaa;"></td>
+          <td style="border-right:1px solid #aaa;"></td>
+        </tr>`,
+        )
+        .join("")}
+
+      <tr>
+        <td style="border-left:1px solid #aaa;border-right:1px solid #aaa;border-top:1px solid #aaa;"></td>
+        <td style="border-right:1px solid #aaa;border-top:1px solid #aaa;padding:5px 6px;text-align:right;font-size:10.5px;color:#333;">
+          IGST Output-${gstRate}% (${companyInfo.stateName})
+        </td>
+        <td style="border-right:1px solid #aaa;border-top:1px solid #aaa;"></td>
+        <td style="border-right:1px solid #aaa;border-top:1px solid #aaa;"></td>
+        <td style="border-right:1px solid #aaa;border-top:1px solid #aaa;padding:5px 6px;text-align:center;font-size:10.5px;">${gstRate}</td>
+        <td style="border-right:1px solid #aaa;border-top:1px solid #aaa;padding:5px 6px;text-align:center;font-size:10.5px;">%</td>
+        <td style="border-right:1px solid #aaa;border-top:1px solid #aaa;padding:5px 6px;text-align:right;font-size:10.5px;">${formatINR(gstAmount)}</td>
+      </tr>
+
+      <tr style="background:#F1F5F9;border-top:2px solid #aaa;">
+        <td style="border:1px solid #aaa;padding:6px;"></td>
+        <td style="border:1px solid #aaa;padding:6px;font-weight:700;font-size:11px;">Total</td>
+        <td style="border:1px solid #aaa;"></td>
+        <td style="border:1px solid #aaa;padding:6px;text-align:center;font-weight:700;font-size:11px;">${bill.keyQuantity} No.</td>
+        <td style="border:1px solid #aaa;"></td>
+        <td style="border:1px solid #aaa;"></td>
+        <td style="border:1px solid #aaa;padding:6px;text-align:right;font-weight:700;font-size:12px;">₹ ${formatINR(Math.round(totalAmount))}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div style="border:1px solid #aaa;border-top:none;display:flex;justify-content:space-between;padding:5px 8px;font-size:10.5px;background:#F1F5F9;">
+    <span><strong>Amount Chargeable (in words):</strong> &nbsp; INR ${amountInWords(Math.round(totalAmount))}</span>
+    <span style="color:#555;font-style:italic;">E. &amp; O.E.</span>
+  </div>
+
+  <table class="tax-table">
+    <thead>
+      <tr>
+        <th>HSN/SAC</th>
+        <th>Taxable Value (₹)</th>
+        <th>IGST Rate</th>
+        <th>IGST Amount (₹)</th>
+        <th>Total Amount (₹)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>${hsnCode}</td>
+        <td>${formatINR(baseAmount)}</td>
+        <td>${gstRate}%</td>
+        <td>${formatINR(gstAmount)}</td>
+        <td><strong>${formatINR(totalAmount)}</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="amount-box" style="margin-top:0;">
+    <div class="amount-row">
+      <span>Taxable Amount (Before GST)</span>
+      <span>₹ ${formatINR(baseAmount)}</span>
+    </div>
+    <div class="amount-row">
+      <span>IGST @ ${gstRate}%</span>
+      <span>₹ ${formatINR(gstAmount)}</span>
+    </div>
+    <div class="amount-row total-row">
+      <span>Total Amount Payable</span>
+      <span>₹ ${formatINR(totalAmount)}</span>
+    </div>
+  </div>
+
+  <div style="margin-top:8px;border:1px solid #aaa;padding:10px 14px;page-break-inside:avoid;">
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:0.4px;margin-bottom:6px;">
+      Company's Bank Details
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;font-size:10.5px;">
+      <div style="display:flex;gap:8px;">
+        <span style="color:#64748b;font-size:10px;min-width:100px;">Account Holder</span>
+        <span style="font-weight:600;color:#1e293b;">: ${companyInfo.bankAccountHolder}</span>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <span style="color:#64748b;font-size:10px;min-width:100px;">Account No.</span>
+        <span style="font-weight:600;color:#1e293b;">: ${companyInfo.bankAccountNumber}</span>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <span style="color:#64748b;font-size:10px;min-width:100px;">Bank Name</span>
+        <span style="font-weight:600;color:#1e293b;">: ${companyInfo.bankName}</span>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <span style="color:#64748b;font-size:10px;min-width:100px;">Branch</span>
+        <span style="font-weight:600;color:#1e293b;">: ${companyInfo.bankBranch}</span>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <span style="color:#64748b;font-size:10px;min-width:100px;">IFSC Code</span>
+        <span style="font-weight:600;color:#1e293b;">: ${companyInfo.bankIFSC}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="terms-title">Terms &amp; Conditions</div>
+  <div class="terms-subtitle">
+    Invoice No: <strong>${bill.billNumber}</strong> &nbsp;|&nbsp;
+    ${companyInfo.companyName} &nbsp;|&nbsp;
+    ${companyInfo.website}
+  </div>
+  ${Page1termsHTML}
+
+  <div class="page1-footer" style="position:static;padding-top:8px;border-top:1px solid #e2e8f0;font-size:9.5px;color:#94a3b8;text-align:center;line-height:1.5; page-break-inside:avoid;">
+    <strong>SUBJECT TO ${companyInfo.jurisdiction} JURISDICTION</strong> &nbsp;|&nbsp;
+    This is a System Generated Invoice |&nbsp; Page 1 of 2
+  </div>
+</div>
+
+<!-- ==================== PAGE 2: TERMS & CONDITIONS ==================== -->
+<div class="terms-page">
+  ${termsHTML}
+
+  <div class="terms-footer">
+    <strong>${companyInfo.companyName}</strong><br>
+    ${companyInfo.addressLine1}, ${companyInfo.addressLine2}, ${companyInfo.cityPincode}<br>
+    Email: ${companyInfo.email} &nbsp;|&nbsp; Website: ${companyInfo.website}<br>
+    GSTIN: ${companyInfo.gstin} &nbsp;|&nbsp; CIN: ${companyInfo.cin}<br><br>
+    <strong>SUBJECT TO ${companyInfo.jurisdiction} JURISDICTION</strong>
+    &nbsp;|&nbsp; Page 2 of 2
+  </div>
+</div>
+
+</body>
+</html>`;
+};
+
+// ---------- Main export ----------
 const generateInvoicePDF = async (bill, entity, keys) => {
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
-  });
-  
+  console.log(`Generating PDF for bill: ${bill.billNumber}`);
+
+  let browser = null;
   try {
-    const page = await browser.newPage();
-    const htmlContent = generateInvoiceHTML(bill, entity, keys);
-    await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-    const pdfBuffer = await page.pdf({
-      format: 'A4',
-      printBackground: true,
+    const isWindows = os.platform() === "win32";
+
+    const launchArgs = isWindows
+      ? ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
+      : [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--disable-gpu",
+          "--no-zygote",
+          "--single-process",
+          "--disable-web-security",
+          "--disable-features=IsolateOrigins",
+        ];
+
+    browser = await puppeteer.launch({
+      headless: "new",
+      args: launchArgs,
+      protocolTimeout: 60000, // gives more time before "Target closed"-type failures
     });
-    return pdfBuffer;
+
+    const page = await browser.newPage();
+    await page.setViewport({ width: 1200, height: 1600, deviceScaleFactor: 1 });
+
+    const html = generateHTML(bill, entity, keys);
+
+    await page.setContent(html, {
+      waitUntil: "domcontentloaded",
+      timeout: 15000,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    const pdfBuffer = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      preferCSSPageSize: true,
+      margin: { top: "20px", bottom: "20px", left: "20px", right: "20px" },
+      displayHeaderFooter: false,
+      landscape: false,
+    });
+
+    console.log(
+      `PDF generated. Size: ${(pdfBuffer.length / 1024).toFixed(2)} KB`,
+    );
+    return Buffer.from(pdfBuffer);
+  } catch (error) {
+    console.error("Error generating PDF:", error);
+    throw new Error(`Failed to generate PDF: ${error.message}`);
   } finally {
-    await browser.close();
+    if (browser) await browser.close();
   }
 };
 

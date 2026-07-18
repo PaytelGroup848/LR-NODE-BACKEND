@@ -1,22 +1,24 @@
-const invoiceCompanyInfo = {
-  name: "PayTel Financial Technologies Pvt. Ltd.(Delhi)",
-  address: "A-212, 1st Floor, Phase-3, Okhla Industrial Area",
-  city: "New Delhi",
-  state: "Delhi",
-  pincode: "110020",
+module.exports = {
+  companyName: "PayTel Financial Technologies Pvt. Ltd.(Delhi)",
+  addressLine1: "A-212, 1st Floor, Phase-3",
+  addressLine2: "Okhla Industrial Area",
+  cityPincode: "New Delhi-110020",
   gstin: "07AALCP3083C1ZH",
-  // phone: "+91-98765-43210",
+  stateName: "Delhi",
+  stateCode: "07",
+  cin: "U74999DL2020PTC367460",
   email: "customercare@cloudedata.com",
   website: "www.cloudedata.com",
-  logoPath: "frontend/public/Cloudedata.svg",
-  bankDetails: {
-    accountHolder: "PAYTEL FINANCIAL TECHNOLOGIES PVT. LTD.",
-    bankName: "Yes Bank Ltd.",
-    branch: "Okhla Industrial Estate-3",
-    accountNumber: "029861900004141",
-    ifscCode: "YESB0000298",
-  },
   jurisdiction: "DELHI",
-};
 
-module.exports = invoiceCompanyInfo;
+  logoPath: "public/Cloudedata.svg",
+  logoFallbackUrl: "https://cloudedata.com/Cloudedata.svg",
+
+  bankAccountHolder: "PAYTEL FINANCIAL TECHNOLOGIES PVT. LTD.",
+  bankName: "Yes Bank Ltd.",
+  bankAccountNumber: "029861900004141",
+  bankBranch: "Okhla Industrial Estate-3",
+  bankIFSC: "YESB0000298",
+
+  hsnCode: "997331",
+};
