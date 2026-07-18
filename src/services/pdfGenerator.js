@@ -114,15 +114,15 @@ const termsAndConditionsPage1 = [
       "Cloudedata shall provide secure, cloud-hosted access to its Accounting ERP solution, including storage and management of the Client's accounting data on its dedicated servers.",
     ],
   },
-];
-
-const termsAndConditions = [
   {
     title: "Data Responsibility & Security",
     points: [
       "Cloudedata takes full responsibility for uptime, access, and safeguarding of the Client's ERP data. In the event of a cyber-attack or malicious intrusion, Cloudedata shall restore the most recent verified backup to resume operations. Cloudedata shall not be liable beyond the point of the last backup.",
     ],
   },
+];
+
+const termsAndConditions = [
   {
     title: "Client Conduct & Liability",
     points: [
@@ -212,23 +212,41 @@ const generateHTML = (bill, entity, keys) => {
     { day: "2-digit", month: "short", year: "numeric" },
   );
 
-  // Sub-rows: one per generated key
-  const keyRowsHTML = keys
-    .map(
-      (k) => `
-      <tr>
-        <td style="border-left:1px solid #aaa;border-right:1px solid #aaa;padding:3px 6px;"></td>
-        <td style="border-right:1px solid #aaa;padding:3px 6px 3px 18px;font-size:10.5px;color:#333;">
-          ${k.key} &nbsp;(${new Date(k.issuedAt).toLocaleDateString("en-IN")} – ${new Date(k.expiresAt).toLocaleDateString("en-IN")})
-        </td>
-        <td style="border-right:1px solid #aaa;"></td>
-        <td style="border-right:1px solid #aaa;"></td>
-        <td style="border-right:1px solid #aaa;"></td>
-        <td style="border-right:1px solid #aaa;"></td>
-        <td style="border-right:1px solid #aaa;"></td>
-      </tr>`,
-    )
-    .join("");
+  const MAX_KEYS_SHOWN = 3;
+  const visibleKeys = keys.slice(0, MAX_KEYS_SHOWN);
+  const remainingKeysCount = keys.length - visibleKeys.length;
+
+  const keyRowsHTML =
+    visibleKeys
+      .map(
+        (k) => `
+    <tr>
+      <td style="border-left:1px solid #aaa;border-right:1px solid #aaa;padding:3px 6px;"></td>
+      <td style="border-right:1px solid #aaa;padding:3px 6px 3px 18px;font-size:10.5px;color:#333;">
+        ${k.key} &nbsp;(${new Date(k.issuedAt).toLocaleDateString("en-IN")} – ${new Date(k.expiresAt).toLocaleDateString("en-IN")})
+      </td>
+      <td style="border-right:1px solid #aaa;"></td>
+      <td style="border-right:1px solid #aaa;"></td>
+      <td style="border-right:1px solid #aaa;"></td>
+      <td style="border-right:1px solid #aaa;"></td>
+      <td style="border-right:1px solid #aaa;"></td>
+    </tr>`,
+      )
+      .join("") +
+    (remainingKeysCount > 0
+      ? `
+    <tr>
+      <td style="border-left:1px solid #aaa;border-right:1px solid #aaa;padding:3px 6px;"></td>
+      <td style="border-right:1px solid #aaa;padding:3px 6px 3px 18px;font-size:10.5px;color:#666;font-style:italic;">
+        ...+${remainingKeysCount} more key${remainingKeysCount > 1 ? "s" : ""}
+      </td>
+      <td style="border-right:1px solid #aaa;"></td>
+      <td style="border-right:1px solid #aaa;"></td>
+      <td style="border-right:1px solid #aaa;"></td>
+      <td style="border-right:1px solid #aaa;"></td>
+      <td style="border-right:1px solid #aaa;"></td>
+    </tr>`
+      : "");
 
   const Page1termsHTML = termsAndConditionsPage1
     .map(
@@ -284,7 +302,7 @@ const generateHTML = (bill, entity, keys) => {
     .page::before {
       content: "";
       position: absolute;
-      top: 50%;
+      top: 43%;
       left: 50%;
       transform: translate(-50%, -50%) rotate(-20deg);
       width: 120mm;
@@ -488,18 +506,23 @@ const generateHTML = (bill, entity, keys) => {
 
       ${keyRowsHTML}
 
-      ${Array(Math.max(0, 6 - keys.length))
+      ${Array(
+        Math.max(
+          0,
+          6 - (visibleKeys.length + (remainingKeysCount > 0 ? 1 : 0)),
+        ),
+      )
         .fill(
           `
-        <tr style="height:18px;">
-          <td style="border-left:1px solid #aaa;border-right:1px solid #aaa;"></td>
-          <td style="border-right:1px solid #aaa;"></td>
-          <td style="border-right:1px solid #aaa;"></td>
-          <td style="border-right:1px solid #aaa;"></td>
-          <td style="border-right:1px solid #aaa;"></td>
-          <td style="border-right:1px solid #aaa;"></td>
-          <td style="border-right:1px solid #aaa;"></td>
-        </tr>`,
+  <tr style="height:18px;">
+    <td style="border-left:1px solid #aaa;border-right:1px solid #aaa;"></td>
+    <td style="border-right:1px solid #aaa;"></td>
+    <td style="border-right:1px solid #aaa;"></td>
+    <td style="border-right:1px solid #aaa;"></td>
+    <td style="border-right:1px solid #aaa;"></td>
+    <td style="border-right:1px solid #aaa;"></td>
+    <td style="border-right:1px solid #aaa;"></td>
+  </tr>`,
         )
         .join("")}
 
