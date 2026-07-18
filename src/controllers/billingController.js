@@ -184,7 +184,7 @@ const getBill = async (req, res, next) => {
 
 const getBillPDF = async (req, res, next) => {
   try {
-    const { mode } = req.query; // 'view' or 'download'
+    const { mode } = req.query; 
     const bill = await Bill.findById(req.params.id)
       .populate('entityId')
       .lean();
