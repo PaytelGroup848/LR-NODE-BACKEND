@@ -1,24 +1,22 @@
-// Invoice Company Configuration for LR License Management
-// Note: Update these values with actual company details before going live
 const invoiceCompanyInfo = {
-  name: "LR Solutions Private Limited", // TODO: Replace with actual company name
-  address: "123 Business Avenue, Tech Park", // TODO: Replace with actual address
-  city: "Mumbai", // TODO: Replace with actual city
-  state: "Maharashtra", // TODO: Replace with actual state
-  pincode: "400001", // TODO: Replace with actual pincode
-  gstin: "27AAACXXXXXXXXX", // TODO: Replace with actual GSTIN
-  phone: "+91-98765-43210", // TODO: Replace with actual phone number
-  email: "contact@lrsolutions.com", // TODO: Replace with actual email
-  website: "https://www.lrsolutions.com", // TODO: Replace with actual website
-  logoPath: "frontend/public/Cloudedata.svg", // Path to company logo
+  name: "PayTel Financial Technologies Pvt. Ltd.(Delhi)",
+  address: "A-212, 1st Floor, Phase-3, Okhla Industrial Area",
+  city: "New Delhi",
+  state: "Delhi",
+  pincode: "110020",
+  gstin: "07AALCP3083C1ZH",
+  // phone: "+91-98765-43210",
+  email: "customercare@cloudedata.com",
+  website: "www.cloudedata.com",
+  logoPath: "frontend/public/Cloudedata.svg",
   bankDetails: {
-    accountHolder: "LR Solutions Private Limited", // TODO: Replace with actual account holder name
-    bankName: "State Bank of India", // TODO: Replace with actual bank name
-    branch: "Main Branch, Mumbai", // TODO: Replace with actual branch
-    accountNumber: "1234567890123456", // TODO: Replace with actual account number
-    ifscCode: "SBIN0001234", // TODO: Replace with actual IFSC code
+    accountHolder: "PAYTEL FINANCIAL TECHNOLOGIES PVT. LTD.",
+    bankName: "Yes Bank Ltd.",
+    branch: "Okhla Industrial Estate-3",
+    accountNumber: "029861900004141",
+    ifscCode: "YESB0000298",
   },
-  jurisdiction: "Mumbai", // TODO: Replace with actual jurisdiction
+  jurisdiction: "DELHI",
 };
 
 module.exports = invoiceCompanyInfo;
