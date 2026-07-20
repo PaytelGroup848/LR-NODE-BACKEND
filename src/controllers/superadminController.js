@@ -551,6 +551,74 @@ const deleteClient = async (req, res, next) => {
   }
 };
 
+const suspendClient = async (req, res, next) => {
+  try {
+    const client = await User.findOneAndUpdate(
+      { _id: req.params.id },
+      { status: "suspended" },
+      { new: true },
+    );
+
+    if (!client) {
+      return res.status(404).json(errorResponse("Client not found"));
+    }
+
+    res.json(successResponse(client));
+  } catch (err) {
+    next(err);
+  }
+};
+
+const unsuspendClient = async (req, res, next) => {
+  try {
+    const client = await User.findOneAndUpdate(
+      { _id: req.params.id },
+      { status: "active" },
+      { new: true },
+    );
+
+    if (!client) {
+      return res.status(404).json(errorResponse("Client not found"));
+    }
+
+    res.json(successResponse(client));
+  } catch (err) {
+    next(err);
+  }
+};
+
+const updatePartner = async (req, res, next) => {
+  try {
+    const allowedFields = [
+      "representativeName",
+      "companyName",
+      "phone",
+      "email",
+      "address",
+      "gstNumber",
+      "salesRepresentativeName",
+    ];
+    const updates = {};
+    allowedFields.forEach((field) => {
+      if (req.body[field] !== undefined) updates[field] = req.body[field];
+    });
+
+    const partner = await User.findOneAndUpdate(
+      { _id: req.params.id },
+      updates,
+      { new: true, runValidators: true },
+    );
+
+    if (!partner) {
+      return res.status(404).json(errorResponse("Partner not found"));
+    }
+
+    res.json(successResponse(partner));
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   createClient,
   listClients,
@@ -573,4 +641,7 @@ module.exports = {
   getClientById,
   updateClient,
   deleteClient,
+  suspendClient,
+  unsuspendClient,
+  updatePartner,
 };
