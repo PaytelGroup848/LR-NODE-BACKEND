@@ -21,6 +21,9 @@ const {
   unsuspendPartner,
   getPartnerStats,
   getDashboard,
+  updateClient,
+  deleteClient,
+  getClientById,
 } = require('../controllers/superadminController');
 const {
   generateBill,
@@ -38,6 +41,9 @@ router.post('/clients', createClient);
 router.get('/clients', listClients);
 router.get('/clients/:id', getClient);
 router.post('/clients/:id/keys/generate', generateClientKeys);
+router.patch("/clients/:id", updateClient);
+router.delete("/clients/:id", deleteClient);
+router.get("/clients/:id", getClientById);
 
 router.get('/keys', listKeys);
 router.patch('/keys/:keyId', updateKey);

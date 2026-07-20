@@ -477,6 +477,80 @@ const getDashboard = async (req, res, next) => {
   }
 };
 
+const getClientById = async (req, res, next) => {
+  try {
+    const client = await User.findOne({
+      _id: req.params.id,
+      role: Role.SUPERADMIN_CLIENT,
+    }).lean();
+
+    if (!client) {
+      return res.status(404).json(errorResponse("Client not found"));
+    }
+
+    const keys = await LicenseKey.find({ assignedToClient: client._id })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.json(successResponse({ ...client, keys }));
+  } catch (err) {
+    next(err);
+  }
+};
+
+const updateClient = async (req, res, next) => {
+  try {
+    const allowedFields = [
+      "representativeName",
+      "companyName",
+      "phone",
+      "email",
+      "address",
+      "gstNumber",
+      "salesRepresentativeName",
+    ];
+    const updates = {};
+    allowedFields.forEach((field) => {
+      if (req.body[field] !== undefined) updates[field] = req.body[field];
+    });
+
+    const client = await User.findOneAndUpdate(
+      { _id: req.params.id },
+      updates,
+      { new: true, runValidators: true },
+    );
+
+    if (!client) {
+      return res.status(404).json(errorResponse("Client not found"));
+    }
+
+    res.json(successResponse(client));
+  } catch (err) {
+    next(err);
+  }
+};
+
+const deleteClient = async (req, res, next) => {
+  try {
+    const client = await User.findOneAndDelete({
+      _id: req.params.id,
+    });
+
+    if (!client) {
+      return res.status(404).json(errorResponse("Client not found"));
+    }
+
+    await LicenseKey.updateMany(
+      { assignedToClient: client._id },
+      { $set: { assignedToClient: null, status: "unassigned" } },
+    );
+
+    res.json(successResponse({ message: "Client deleted successfully" }));
+  } catch (err) {
+    next(err);
+  }
+};
+
 module.exports = {
   createClient,
   listClients,
@@ -496,4 +570,7 @@ module.exports = {
   unsuspendPartner,
   getPartnerStats,
   getDashboard,
+  getClientById,
+  updateClient,
+  deleteClient,
 };
